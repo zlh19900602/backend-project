@@ -25,8 +25,16 @@ db.connect((err) => {
   }
 });
 
+// 生成一个带有 "U" 开头的10位不重复数的函数
+const generateUserId = () => {
+  const timestamp = Date.now().toString(); // 获取当前时间戳
+  const randomDigits = Math.floor(Math.random() * 1000).toString().padStart(3, '0'); // 生成3位随机数
+  const userId = `U${timestamp.slice(-7)}${randomDigits}`; // 最终生成的10位数
+  return userId;
+}
+
 // 插入用户信息的接口
-app.post('/insert-user', (req, res) => {
+app.post('/insertUser', (req, res) => {
   const { userName, uName, gender, mobile, state } = req.body;
 
   // 检查是否缺少必填字段
@@ -34,12 +42,15 @@ app.post('/insert-user', (req, res) => {
     return res.status(400).json({ message: '缺少必要字段' });
   }
 
+  // 生成唯一的userId
+  const userId = generateUserId();
+
   // 插入用户信息的 SQL 语句
-  const sql = `INSERT INTO user (userName, uName, gender, mobile, state, createTime, updateTime) 
-               VALUES (?, ?, ?, ?, ?, NOW(), NOW())`;
+  const sql = `INSERT INTO user (userId, userName, uName, gender, mobile, state, createTime, updateTime) 
+               VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`;
 
   // 执行插入操作
-  db.query(sql, [userName, uName, gender, mobile, state], (err, result) => {
+  db.query(sql, [userId, userName, uName, gender, mobile, state], (err, result) => {
     if (err) {
       console.error('插入数据失败:', err);
       return res.status(500).json({ message: '插入数据失败' });
@@ -47,6 +58,22 @@ app.post('/insert-user', (req, res) => {
     res.status(200).json({ message: '用户信息插入成功', userId: result.insertId });
   });
 });
+
+// 查询用户信息接口
+app.post('/queryUser', (req, res) => {
+  // 查询所有用户的SQL语句
+  const sql = `SELECT * FROM user`;
+
+  // 执行查询操作
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error('查询用户列表失败:', err);
+      return res.status(500).json({ message: '查询用户列表失败' });
+    }
+    res.status(200).json(result);
+  })
+})
+
 
 // 监听端口
 app.listen(8088, () => {
