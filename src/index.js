@@ -84,6 +84,34 @@ app.post('/queryUser', (req, res) => {
   })
 })
 
+// 根据userId查询用户信息接口
+app.post('/queryUserById', (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: '缺少userId参数' });
+  }
+
+  // 查询用户信息的sql语句
+  const sql = `SELECT * FROM user WHERE userId = ?`;
+
+  // 执行查询操作
+  db.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error('查询用户信息失败:', err);
+      return res.status(500).json({ message: '查询用户信息失败' });
+    }
+    if (result.length === 0) {
+      return res.status(500).json({ message: '未找到对应的用户' });
+    }
+    // 格式化返回结果中的时间字段
+    const user = result[0];
+    user.createTime = moment(user.createTime).format('YYYY-MM-DD HH:mm:ss');
+    user.updateTime = moment(user.updateTime).format('YYYY-MM-DD HH:mm:ss');
+
+    res.status(200).json(user);
+  })
+})
+
 
 // 监听端口
 app.listen(8088, () => {
