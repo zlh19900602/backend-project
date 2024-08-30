@@ -1,5 +1,6 @@
 const express = require('express');
 const mysql = require('mysql2');
+const moment = require('moment');
 
 // 创建 Express 应用
 const app = express();
@@ -70,7 +71,16 @@ app.post('/queryUser', (req, res) => {
       console.error('查询用户列表失败:', err);
       return res.status(500).json({ message: '查询用户列表失败' });
     }
-    res.status(200).json(result);
+
+    // 格式化返回结果中的时间字段
+    const formattedResult = result.map(user => {
+      return {
+        ...user,
+        createTime: moment(user.createTime).format('YYYY-MM-DD HH:mm:ss'),
+        updateTime: moment(user.updateTime).format('YYYY-MM-DD HH:mm:ss'),
+      }
+    })
+    res.status(200).json(formattedResult)
   })
 })
 
