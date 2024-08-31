@@ -83,7 +83,7 @@ router.post("/queryUserById", (req, res) => {
 
   // 获取数据库连接对象
   const db = req.db; // 从 req 对象中获取 db
-  
+
   // 查询用户信息的sql语句
   const sql = `SELECT * FROM user WHERE userId = ?`;
 
@@ -102,6 +102,87 @@ router.post("/queryUserById", (req, res) => {
     user.updateTime = moment(user.updateTime).format("YYYY-MM-DD HH:mm:ss");
 
     res.status(200).json(user);
+  });
+});
+
+// 根据userId修改用户为禁用状态接口
+router.post("/updateStateForbiddenById", (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "缺少userId参数" });
+  }
+
+  // 获取数据库连接对象
+  const db = req.db; // 从 req 对象中获取 db
+  
+  // 查询用户信息的sql语句
+  const sql = `update user set state=2 where userId = ?`;
+
+  // 执行查询操作
+  db.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error("用户禁用状态修改失败:", err);
+      return res.status(500).json({ message: "用户禁用状态修改失败" });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(500).json({ message: "未找到对应的用户" });
+    }
+
+    res.status(200).json({ code: '0', message: "状态更改成功" });
+  });
+});
+
+// 根据userId修改用户为注销状态接口
+router.post("/updateStateLogoutById", (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "缺少userId参数" });
+  }
+
+  // 获取数据库连接对象
+  const db = req.db; // 从 req 对象中获取 db
+  
+  // 查询用户信息的sql语句
+  const sql = `update user set state='0' where userId = ?`;
+
+  // 执行查询操作
+  db.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error("用户注销状态修改失败:", err);
+      return res.status(500).json({ message: "用户注销状态修改失败" });
+    }
+    if (result.affectedRows  === 0) {
+      return res.status(500).json({ message: "未找到对应的用户" });
+    }
+
+    res.status(200).json({ code: '0', message: "状态更改成功" });
+  });
+});
+
+// 根据userId修改用户信息接口
+router.post("/updateUserInfoById", (req, res) => {
+  const { userId, userName, uName, gender, mobile, state } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "缺少userId参数" });
+  }
+
+  // 获取数据库连接对象
+  const db = req.db; // 从 req 对象中获取 db
+  
+  // 查询用户信息的sql语句
+  const sql = `UPDATE user set userName = ?, uName = ?, gender = ?, mobile = ?, state = ? WHERE userId = ?`;
+
+  // 执行查询操作
+  db.query(sql, [userName, uName, gender, mobile, state, userId], (err, result) => {
+    if (err) {
+      console.error("用户信息修改失败:", err);
+      return res.status(500).json({ message: "用户信息修改失败" });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(500).json({ message: "未找到对应的用户" });
+    }
+
+    res.status(200).json({ code: '0', message: "用户信息更新成功" });
   });
 });
 
