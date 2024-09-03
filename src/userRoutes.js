@@ -1,6 +1,10 @@
 const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const moment = require("moment");
 const router = express.Router();
+
+const JWT_SECRET = "lg_jwt_secret_key";
 
 // 生成一个带有 "U" 开头的10位不重复数的函数
 const generateUserId = () => {
@@ -12,8 +16,89 @@ const generateUserId = () => {
   return userId;
 };
 
+// 登录接口
+router.post("/login", (req, res) => {
+  const { userName, password } = req.body;
+  console.log(userName, 'username');
+  console.log(password, 'password');
+  if (!userName || !password) {
+    return res.status(400).json({ message: "缺少用户名或密码" });
+  }
+
+  // 获取数据库连接对象
+  const db = req.db; // 从 req 对象中获取 db
+  const sql = `SELECT * FROM user WHERE userName = ?`;
+
+  db.query(sql, [userName], async (err, result) => {
+    console.log(err, 'errerr')
+    console.log(result, 'resultresult')
+    if (err) {
+      console.error("登录查询失败:", err);
+      return res.status(500).json({ message: "登录查询失败" });
+    }
+    if (result.length === 0) {
+      return res.status(400).json({ message: "用户名或密码错误" });
+    }
+
+    const user = result[0];
+    console.log(password, 'password');
+    console.log(user.password, 'user.password');
+    const match = await bcrypt.compare(password, user.password);
+    console.log(match, 'matchmatch')
+    if (!match) {
+      return res.status(400).json({ message: "用户名或密码错误" });
+    }
+
+    // 生成JWT
+    const token = jwt.sign({ userId: user.userId}, JWT_SECRET, { expiresIn: "1h" });
+
+    res.status(200).json({ message: "登录成功", token });
+  })
+})
+
+// 更新用户密码接口
+router.post("/updatePassword", async (req, res) => {
+  const {userName, oldPwd, newPwd } = req.body;
+  if (!userName || !oldPwd || !newPwd) {
+    return res.status(400).json({ message: "缺少必要字段" });
+  }
+
+  const db = req.db; // 从 req 对象中获取 db
+  // 从数据库中获取用户信息
+  const sql = `SELECT * FROM user WHERE userName = ?`;
+  db.query(sql, [userName], async (err, result) => {
+    if (err) {
+      console.error('查询用户信息失败：', err);
+      return res.status(500).json({ message: '查询用户信息失败'});
+    }
+    
+    if (result.length === 0) {
+      return res.status(400).json({ message: '用户不存在' });
+    }
+
+    const user = result[0];
+    // 验证旧密码是否正确
+    const isMatch = await bcrypt.compare(oldPwd, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: '旧密码错误' });
+    }
+    // 使用 bcrypt 哈希加密新密码
+    const hashedPassword = await bcrypt.hash(newPwd, 10);
+
+    // 更新数据库中的密码
+    const sql = `UPDATE user SET password = ? WHERE userName = ?`;
+    db.query(sql, [hashedPassword, userName], (err, result) => {
+      if (err) {
+        console.error('更新密码失败:', err);
+        return res.status(500).json({ message: '更新密码失败' });
+      }
+      res.status(200).json({ code: '0', message: '密码更新成功' });
+    })
+  })
+})
+
 // 插入用户信息的接口
-router.post("/insertUser", (req, res) => {
+router.post("/insertUser", async (req, res) => {
   const { userName, uName, gender, mobile, state } = req.body;
 
   // 检查是否缺少必填字段
@@ -23,18 +108,22 @@ router.post("/insertUser", (req, res) => {
 
   // 生成唯一的userId
   const userId = generateUserId();
+  // 对密码进行哈希处理
+  const defaultPassword = "123456";
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+  console.log(hashedPassword, 'hashedPassword')
 
   // 获取数据库连接对象
   const db = req.db; // 从 req 对象中获取 db
 
   // 插入用户信息的 SQL 语句
-  const sql = `INSERT INTO user (userId, userName, uName, gender, mobile, state, createTime, updateTime) 
-                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+  const sql = `INSERT INTO user (userId, userName, uName, gender, mobile, state, password, createTime, updateTime) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
 
   // 执行插入操作
   db.query(
     sql,
-    [userId, userName, uName, gender, mobile, state],
+    [userId, userName, uName, gender, mobile, state, hashedPassword],
     (err, result) => {
       if (err) {
         console.error("插入数据失败:", err);
