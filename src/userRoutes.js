@@ -19,8 +19,6 @@ const generateUserId = () => {
 // 登录接口
 router.post("/login", (req, res) => {
   const { userName, password } = req.body;
-  console.log(userName, 'username');
-  console.log(password, 'password');
   if (!userName || !password) {
     return res.status(400).json({ message: "缺少用户名或密码" });
   }
@@ -30,8 +28,6 @@ router.post("/login", (req, res) => {
   const sql = `SELECT * FROM user WHERE userName = ?`;
 
   db.query(sql, [userName], async (err, result) => {
-    console.log(err, 'errerr')
-    console.log(result, 'resultresult')
     if (err) {
       console.error("登录查询失败:", err);
       return res.status(500).json({ message: "登录查询失败" });
@@ -41,32 +37,31 @@ router.post("/login", (req, res) => {
     }
 
     const user = result[0];
-    console.log(password, 'password');
-    console.log(user.password, 'user.password');
     const match = await bcrypt.compare(password, user.password);
-    console.log(match, 'matchmatch')
     if (!match) {
       return res.status(400).json({ message: "用户名或密码错误" });
     }
 
     // 生成JWT
     const token = jwt.sign({ userId: user.userId}, JWT_SECRET, { expiresIn: "1h" });
-
-    res.status(200).json({ message: "登录成功", token });
+    console.log(user, 'useruser')
+    res.status(200).json({ code: '0', message: "登录成功", info: {
+      token, userId: user.userId, userName: user.userName, uName: user.uName, mobile: user.mobile
+    }});
   })
 })
 
 // 更新用户密码接口
 router.post("/updatePassword", async (req, res) => {
-  const {userName, oldPwd, newPwd } = req.body;
-  if (!userName || !oldPwd || !newPwd) {
+  const {userId, oldPwd, newPwd } = req.body;
+  if (!userId || !oldPwd || !newPwd) {
     return res.status(400).json({ message: "缺少必要字段" });
   }
 
   const db = req.db; // 从 req 对象中获取 db
   // 从数据库中获取用户信息
-  const sql = `SELECT * FROM user WHERE userName = ?`;
-  db.query(sql, [userName], async (err, result) => {
+  const sql = `SELECT * FROM user WHERE userId = ?`;
+  db.query(sql, [userId], async (err, result) => {
     if (err) {
       console.error('查询用户信息失败：', err);
       return res.status(500).json({ message: '查询用户信息失败'});
@@ -86,13 +81,49 @@ router.post("/updatePassword", async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPwd, 10);
 
     // 更新数据库中的密码
-    const sql = `UPDATE user SET password = ? WHERE userName = ?`;
-    db.query(sql, [hashedPassword, userName], (err, result) => {
+    const sql = `UPDATE user SET password = ? WHERE userId = ?`;
+    db.query(sql, [hashedPassword, userId], (err, result) => {
       if (err) {
         console.error('更新密码失败:', err);
         return res.status(500).json({ message: '更新密码失败' });
       }
       res.status(200).json({ code: '0', message: '密码更新成功' });
+    })
+  })
+})
+
+// 重置用户密码为123456接口
+router.post("/resetUserPassword", async (req, res) => {
+  const {userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "缺少必要字段" });
+  }
+
+  const db = req.db; // 从 req 对象中获取 db
+  // 从数据库中获取用户信息
+  const sql = `SELECT * FROM user WHERE userId = ?`;
+  db.query(sql, [userId], async (err, result) => {
+    if (err) {
+      console.error('查询用户信息失败：', err);
+      return res.status(500).json({ message: '查询用户信息失败'});
+    }
+    
+    if (result.length === 0) {
+      return res.status(400).json({ message: '用户不存在' });
+    }
+
+    const defaultPassword = "123456";
+    // 使用 bcrypt 哈希加密新密码
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+    // 重置数据库中的密码
+    const sql = `UPDATE user SET password = ? WHERE userId = ?`;
+    db.query(sql, [hashedPassword, userId], (err, result) => {
+      if (err) {
+        console.error('密码重置失败:', err);
+        return res.status(500).json({ message: '密码重置失败' });
+      }
+      res.status(200).json({ code: '0', message: '密码重置成功' });
     })
   })
 })
@@ -111,7 +142,6 @@ router.post("/insertUser", async (req, res) => {
   // 对密码进行哈希处理
   const defaultPassword = "123456";
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-  console.log(hashedPassword, 'hashedPassword')
 
   // 获取数据库连接对象
   const db = req.db; // 从 req 对象中获取 db
@@ -138,14 +168,29 @@ router.post("/insertUser", async (req, res) => {
 
 // 查询用户信息接口
 router.post("/queryUser", (req, res) => {
+  const { userName, mobile, state } = req.body;
   // 获取数据库连接对象
   const db = req.db; // 从 req 对象中获取 db
 
   // 查询所有用户的SQL语句
-  const sql = `SELECT * FROM user`;
+  let sql = `SELECT * FROM user WHERE 1=1`;
+  const params = [];
+
+  if (userName) {
+    sql += ` AND userName LIKE ?`;
+    params.push(`%${userName}%`); // 模糊查询
+  }
+  if (mobile) {
+    sql += ` AND mobile LIKE ?`;
+    params.push(`%${mobile}%`); // 模糊查询
+  }
+  if (state) {
+    sql += ` AND state LIKE ?`;
+    params.push(`%${state}%`); // 模糊查询
+  }
 
   // 执行查询操作
-  db.query(sql, (err, result) => {
+  db.query(sql, params, (err, result) => {
     if (err) {
       console.error("查询用户列表失败:", err);
       return res.status(500).json({ message: "查询用户列表失败" });
